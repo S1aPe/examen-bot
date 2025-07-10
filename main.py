@@ -106,7 +106,7 @@ def add_income(message):
 @bot.message_handler(commands=['add_expense'])
 def add_expense(message):
     try:
-        # Разбираем команду
+        # Разбираем команду1
         parts = message.text.split(maxsplit=2)
         if len(parts) < 3:
             raise ValueError
