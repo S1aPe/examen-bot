@@ -62,21 +62,21 @@ def create_combined_chart(chat_id):
     plt.close()
     return 'chart.png'
 
-@bot.message_handler(commands=['start'])
+@bot.message_handler(commands=['start', 'help'])
 def start(message):
     help_text = """
 💰 <b>Финансовый помощник</b> 💰
 
 Доступные команды:
 /add_income [сумма] - добавить доход
-/add_expense [категория] [сумма] - добавить расход
+/add_expense [категория] [сумма] - добавить расход (категория необязательна)
 /report - показать отчёт
 /clear - сбросить данные
 
 Примеры:
 /add_income 15000
 /add_expense продукты 3500
-/add_expense транспорт 2000
+/add_expense 2000 (добавится в категорию "другое")
 /report
 """
     bot.send_message(message.chat.id, help_text, parse_mode='HTML')
@@ -106,14 +106,19 @@ def add_income(message):
 @bot.message_handler(commands=['add_expense'])
 def add_expense(message):
     try:
-        # Разбираем команду1
-        parts = message.text.split(maxsplit=2)
-        if len(parts) < 3:
-            raise ValueError
-        
-        category = parts[1]
-        amount = float(parts[2])
+        # Разбираем команду
+        parts = message.text.split()
         chat_id = message.chat.id
+        
+        # Определяем категорию и сумму
+        if len(parts) == 2:  # Только сумма (/add_expense 100)
+            category = "другое"
+            amount = float(parts[1])
+        elif len(parts) >= 3:  # Категория и сумма (/add_expense еда 100)
+            category = parts[1]
+            amount = float(parts[2])
+        else:
+            raise ValueError
         
         # Обновляем данные
         user_data[chat_id]['expenses'][category] += amount
@@ -125,10 +130,8 @@ def add_expense(message):
                 chat_id, photo,
                 caption=f"💸 Добавлен расход: {category} -{amount:.2f} руб.\nВсего в категории: {user_data[chat_id]['expenses'][category]:.2f} руб."
             )
-    except IndexError:
-        bot.reply_to(message, "❌ Укажите категорию и сумму!\nПример: /add_expense продукты 3500")
     except ValueError:
-        bot.reply_to(message, "❌ Неверный формат!\nИспользуйте: /add_expense [категория] [сумма]")
+        bot.reply_to(message, "❌ Неверный формат!\nИспользуйте: /add_expense [категория] [сумма]\nИли просто: /add_expense [сумма]")
 
 @bot.message_handler(commands=['report'])
 def report(message):
