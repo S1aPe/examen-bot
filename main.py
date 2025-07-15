@@ -11,6 +11,10 @@ user_data = defaultdict(lambda: {
     'expenses': defaultdict(float)
 })
 
+def normalize_category(category):
+    """Приводит категорию к нижнему регистру и убирает лишние пробелы"""
+    return category.strip().lower()
+
 def create_combined_chart(chat_id):
     """Генерация комбинированного графика"""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
@@ -36,7 +40,7 @@ def create_combined_chart(chat_id):
         sizes = []
         for cat, amount in expenses.items():
             percentage = 100 * amount / total_expenses
-            labels.append(f"{cat}\n({percentage:.1f}%)")
+            labels.append(f"{cat.capitalize()}\n({percentage:.1f}%)")
             sizes.append(amount)
         
         wedges, _, _ = ax2.pie(
@@ -69,14 +73,17 @@ def start(message):
 
 Доступные команды:
 /add_income [сумма] - добавить доход
-/add_expense [категория] [сумма] - добавить расход (категория необязательна)
+/add_expense [категория] [сумма] - добавить расход
 /report - показать отчёт
 /clear - сбросить данные
 
+<u>Категории не зависят от регистра!</u>
+"Еда", "еда" и "ЕДА" - это одна категория.
+
 Примеры:
 /add_income 15000
-/add_expense продукты 3500
-/add_expense 2000 (добавится в категорию "другое")
+/add_expense Продукты 3500
+/add_expense продукты 2000
 /report
 """
     bot.send_message(message.chat.id, help_text, parse_mode='HTML')
@@ -84,14 +91,10 @@ def start(message):
 @bot.message_handler(commands=['add_income'])
 def add_income(message):
     try:
-        # Получаем сумму из сообщения
         amount = float(message.text.split()[1])
         chat_id = message.chat.id
-        
-        # Обновляем данные
         user_data[chat_id]['income'] += amount
         
-        # Создаём и отправляем график
         chart = create_combined_chart(chat_id)
         with open(chart, 'rb') as photo:
             bot.send_photo(
@@ -106,29 +109,25 @@ def add_income(message):
 @bot.message_handler(commands=['add_expense'])
 def add_expense(message):
     try:
-        # Разбираем команду
         parts = message.text.split()
         chat_id = message.chat.id
         
-        # Определяем категорию и сумму
-        if len(parts) == 2:  # Только сумма (/add_expense 100)
+        if len(parts) == 2:
             category = "другое"
             amount = float(parts[1])
-        elif len(parts) >= 3:  # Категория и сумма (/add_expense еда 100)
-            category = parts[1]
+        elif len(parts) >= 3:
+            category = normalize_category(parts[1])
             amount = float(parts[2])
         else:
             raise ValueError
         
-        # Обновляем данные
         user_data[chat_id]['expenses'][category] += amount
         
-        # Создаём и отправляем график
         chart = create_combined_chart(chat_id)
         with open(chart, 'rb') as photo:
             bot.send_photo(
                 chat_id, photo,
-                caption=f"💸 Добавлен расход: {category} -{amount:.2f} руб.\nВсего в категории: {user_data[chat_id]['expenses'][category]:.2f} руб."
+                caption=f"💸 Добавлен расход: {category.capitalize()} -{amount:.2f} руб.\nВсего в категории: {user_data[chat_id]['expenses'][category]:.2f} руб."
             )
     except ValueError:
         bot.reply_to(message, "❌ Неверный формат!\nИспользуйте: /add_expense [категория] [сумма]\nИли просто: /add_expense [сумма]")
@@ -141,7 +140,6 @@ def report(message):
     total_expenses = sum(expenses.values())
     balance = income - total_expenses
     
-    # Формируем текст отчёта
     report_text = f"""
 📊 <b>Финансовый отчёт</b>
 ├ Доходы: {income:.2f} руб.
@@ -153,11 +151,10 @@ def report(message):
     if expenses:
         for cat, amount in expenses.items():
             percentage = 100 * amount / total_expenses
-            report_text += f"├ {cat}: {amount:.2f} руб. ({percentage:.1f}%)\n"
+            report_text += f"├ {cat.capitalize()}: {amount:.2f} руб. ({percentage:.1f}%)\n"
     else:
         report_text += "└ Нет данных о расходах\n"
     
-    # Создаём и отправляем график
     chart = create_combined_chart(chat_id)
     with open(chart, 'rb') as photo:
         bot.send_photo(chat_id, photo, caption=report_text, parse_mode='HTML')
